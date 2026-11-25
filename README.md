@@ -306,6 +306,7 @@ AI 每秒分析 1.87 次，單次推論 80 ms（p95 103 ms），相機 14.8 fps�
 - **生成式 AI**：開發過程使用 Anthropic 的 Claude 協助程式撰寫與除錯、實驗腳本設計、數據整理及文件整理。系統需求與功能規劃、硬體組裝、資料收集與標註、模型訓練決策及結果檢核由團隊完成，文中數據皆為實際量測結果。
 - **預訓練模型與開源套件**：Ultralytics YOLO11（COCO 預訓練權重）、ONNX Runtime、OpenCV、Picamera2、Flask、SQLite；比較實驗另使用 YOLOv8、MegaDetector 與 COCO 預訓練模型。
 - **資料與服務**：訓練與驗證影像皆由本團隊自行拍攝與標註；雲端訓練使用 Kaggle，推播使用 ntfy。
+- **模型與工具來源**：依競賽規定，本作品**不使用來源自中國或中資的開源模型（如 DeepSeek 等）及介接工具（如 API、MCP 等）**進行 AI 訓練與應用推論。使用的模型與推論工具皆來自非中國的開發者：Ultralytics YOLO11（英國）、ONNX Runtime（Microsoft）、MegaDetector（Microsoft）；推論引擎已由騰訊開發的 NCNN 改為 ONNX Runtime。
 
 ## 開發團隊
 
