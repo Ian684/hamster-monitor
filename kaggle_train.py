@@ -81,7 +81,7 @@ best = YOLO(str(TMP / "runs/hamster/weights/best.pt"))
 m = best.val(data=str(ds / "data.yaml"), imgsz=imgsz)
 DEPLOY_IMGSZ = 480   # what the Pi runs: on ONNX Runtime 480 was as accurate as 640 on the 跑分 photos in about half the time
 out = pathlib.Path(best.export(format="onnx", imgsz=DEPLOY_IMGSZ, simplify=True))   # runs on the Pi with ONNX Runtime
-pkg = TMP / "hamster_ncnn_model"   # folder name kept from the NCNN days: the Pi's model folders all use it
+pkg = TMP / "hamster_ncnn_model"   # the Pi expects this folder name
 pkg.mkdir(parents=True, exist_ok=True)
 shutil.copy(out, pkg / "model.onnx")
 import datetime as _dt   # metadata.yaml: the input size, class names and training date the Pi reads
