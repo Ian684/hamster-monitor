@@ -1,6 +1,6 @@
 # Runs ON KAGGLE (free GPU), pushed there by autotrain.py. Same training as train_hamster_colab.ipynb:
 # photos + YOLO .txt labels (0 = hamster, 1 = head; no / empty .txt = no hamster) -> YOLO11n -> ONNX (run on the Pi with ONNX Runtime).
-# Output in /kaggle/working: hamster_ncnn_model.zip (what the Pi installs) and result.json (scores).
+# Output in /kaggle/working: hamster_model.zip (what the Pi installs) and result.json (scores).
 import hashlib
 import json
 import re
@@ -81,7 +81,7 @@ best = YOLO(str(TMP / "runs/hamster/weights/best.pt"))
 m = best.val(data=str(ds / "data.yaml"), imgsz=imgsz)
 DEPLOY_IMGSZ = 480   # what the Pi runs: on ONNX Runtime 480 was as accurate as 640 on the 跑分 photos in about half the time
 out = pathlib.Path(best.export(format="onnx", imgsz=DEPLOY_IMGSZ, simplify=True))   # runs on the Pi with ONNX Runtime
-pkg = TMP / "hamster_ncnn_model"   # the Pi expects this folder name
+pkg = TMP / "hamster_model"   # the Pi expects this folder name
 pkg.mkdir(parents=True, exist_ok=True)
 shutil.copy(out, pkg / "model.onnx")
 import datetime as _dt   # metadata.yaml: the input size, class names and training date the Pi reads
@@ -91,7 +91,7 @@ import datetime as _dt   # metadata.yaml: the input size, class names and traini
     f"task: detect\nimgsz:\n- {imgsz}\n- {imgsz}\nnames:\n",
     *(f"  {k}: {v}\n" for k, v in sorted(best.names.items()))]), encoding="utf-8")
 shutil.copy(TMP / "runs/hamster/weights/best.pt", pkg / "best.pt")   # the next training starts from this
-shutil.make_archive(str(OUT / "hamster_ncnn_model"), "zip", str(TMP), "hamster_ncnn_model")
+shutil.make_archive(str(OUT / "hamster_model"), "zip", str(TMP), "hamster_model")
 (OUT / "result.json").write_text(json.dumps({
     "photos": len(imgs), "imgsz": imgsz, "with_hamster": n_ham, "with_head": n_head, "head": train_head, "fine_tuned": start is not None, "val": n_val,
     "map50": round(float(m.box.map50), 3), "map50_95": round(float(m.box.map), 3),

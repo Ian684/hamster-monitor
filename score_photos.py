@@ -14,7 +14,6 @@ The web page starts this automatically in the background when it finds unscored 
 """
 import argparse
 import fcntl
-import hashlib
 import json
 import os
 import sys
@@ -27,20 +26,15 @@ BASE = Path(__file__).resolve().parent
 DATASET = BASE / "data" / "dataset"
 CLIPS = BASE / "data" / "clips"
 SCORES = DATASET / "ai_scores.json"
-MODEL = BASE / "models" / "hamster_ncnn_model"
+MODEL = BASE / "models" / "hamster_model"
 PROGRESS = Path("/run/hamster/scoring.json")
 LOCK = Path("/run/hamster/scoring.lock")
 SURE = 0.45   # same threshold the tracker uses for "this is the hamster"
 
 
 def model_id():
-    from yolo_detector import weights_file
-    p = weights_file(MODEL)
-    h = hashlib.md5()
-    with open(p, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()[:12]
+    from yolo_detector import model_fingerprint
+    return model_fingerprint(MODEL)
 
 
 def read_live(mid):

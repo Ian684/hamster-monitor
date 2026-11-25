@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Install a trained ONNX model zip (from the Colab notebook) and switch the tracker to AI detection.
 
-Usage on the Pi:  cd ~/hamster && .venv/bin/python install_model.py hamster_ncnn_model.zip [--mode hybrid|yolo]
+Usage on the Pi:  cd ~/hamster && .venv/bin/python install_model.py hamster_model.zip [--mode hybrid|yolo]
 Steps: unzip -> check it loads and runs -> back up the old model -> move into place ->
        set [tracker] detector -> restart hamster-tracker. Nothing changes if the check fails.
 """
@@ -18,7 +18,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
 MODELS = BASE / "models"
-TARGET = MODELS / "hamster_ncnn_model"
+TARGET = MODELS / "hamster_model"
 CONFIG = BASE / "config.toml"
 
 
@@ -119,7 +119,7 @@ def install(a, tmp):
         return
 
     # sanity check: loads, runs, reasonable speed. The input size comes from metadata.yaml; when the zip has
-    # none (only the .param/.bin were zipped), find it by trying the usual sizes and write metadata.yaml.
+    # none (only model.onnx was zipped), find it by trying the usual sizes and write metadata.yaml.
     known = read_imgsz(src)
     res, why = None, None
     for size in ([known] if known else SIZES):
@@ -139,7 +139,7 @@ def install(a, tmp):
     MODELS.mkdir(exist_ok=True)
     backup = None
     if TARGET.exists():
-        backup = MODELS / f"hamster_ncnn_model.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+        backup = MODELS / f"hamster_model.bak-{time.strftime('%Y%m%d-%H%M%S')}"
         TARGET.rename(backup)
     shutil.copytree(src, TARGET)
 

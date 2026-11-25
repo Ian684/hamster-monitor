@@ -5,32 +5,19 @@ switching models renames folders, but a model keeps its number. A model seen for
 number (several new ones: in the order they were trained). The owner's own name (title.txt, 管理模型 → 改名)
 always wins over the number.
 """
-import hashlib
 import json
 import os
 import re
 from datetime import datetime
 from pathlib import Path
 
-_ids = {}   # (path, size, mtime) -> fingerprint, so a 16-37 MB file is read once
-
-
 def model_dirs(models):
-    return [d for d in Path(models).glob("hamster_ncnn_model*") if d.is_dir() and (d / "model.onnx").exists()]
+    return [d for d in Path(models).glob("hamster_model*") if d.is_dir() and (d / "model.onnx").exists()]
 
 
 def model_id(d):
-    from yolo_detector import weights_file
-    b = weights_file(d)
-    st = b.stat()
-    key = (str(b), st.st_size, st.st_mtime_ns)
-    if key not in _ids:
-        h = hashlib.md5()
-        with open(b, "rb") as f:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                h.update(chunk)
-        _ids[key] = h.hexdigest()[:12]
-    return _ids[key]
+    from yolo_detector import model_fingerprint
+    return model_fingerprint(d)
 
 
 def trained_at(d):

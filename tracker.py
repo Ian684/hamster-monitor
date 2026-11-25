@@ -307,7 +307,7 @@ def load_yolo(t_cfg):
     mode = t_cfg.get("detector", "motion")
     if mode not in ("yolo", "hybrid"):
         return "motion", None
-    model_dir = BASE / t_cfg.get("yolo_model", "models/hamster_ncnn_model")
+    model_dir = BASE / t_cfg.get("yolo_model", "models/hamster_model")
     if not (model_dir / "model.onnx").exists():
         log.warning("detector=%s but no model at %s; using motion detection", mode, model_dir)
         return "motion", None
@@ -360,17 +360,12 @@ def note_photo_zone(dataset, photo, zone, moved=None):
 
 
 def file_model_id(model_dir):
-    """Same id as score_photos.py / web.py: md5 of the weights, 12 hex digits."""
-    import hashlib
-    h = hashlib.md5()
-    from yolo_detector import weights_file
+    """Same id as score_photos.py / web.py (yolo_detector.model_fingerprint)."""
+    from yolo_detector import model_fingerprint
     try:
-        with open(weights_file(model_dir), "rb") as f:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                h.update(chunk)
+        return model_fingerprint(model_dir)
     except OSError:
         return None
-    return h.hexdigest()[:12]
 
 
 def score_photo(yolo, mid, frame, dataset, photo):
@@ -706,7 +701,7 @@ def main():
 
     detector = MotionDetector(t_cfg)
     mode, yolo = load_yolo(t_cfg)
-    yolo_mid = file_model_id(BASE / t_cfg.get("yolo_model", "models/hamster_ncnn_model")) if yolo else None
+    yolo_mid = file_model_id(BASE / t_cfg.get("yolo_model", "models/hamster_model")) if yolo else None
     t_mbox = -1e9   # last time anything moved in the cage (plain motion detection)
     if yolo:
         from yolo_detector import hamster_and_head

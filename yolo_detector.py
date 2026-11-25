@@ -2,13 +2,12 @@
 """YOLO (Ultralytics YOLO11 / YOLOv8 exported to ONNX) object detector for the Raspberry Pi CPU, on ONNX Runtime.
 
 Usage:
-    det = YoloOnnx("models/hamster_ncnn_model", conf=0.4)
+    det = YoloOnnx("models/hamster_model", conf=0.4)
     for x, y, w, h, score, cls in det.detect(bgr_frame):   # boxes normalized 0..1 to the frame
         ...
 
 Export a trained model with:  yolo export model=best.pt format=onnx imgsz=640 simplify=True
 and save it as model.onnx in the model folder (next to best.pt and metadata.yaml).
-(The folder names still say "ncnn": they predate the switch to ONNX Runtime and are kept so nothing else moves.)
 """
 import ast
 import re
@@ -24,12 +23,31 @@ def has_model(model_dir):
     return (Path(model_dir) / MODEL_FILE).exists()
 
 
-def weights_file(model_dir):
-    """The file a model's fingerprint (id, version number) is taken from. Models from before the switch keep the id
-    of their original weights file, so their version numbers don't change; newer ones use model.onnx."""
+ID_FILE = "model.id"
+_fp = {}   # (path, size, mtime) -> fingerprint, so the model file is read once
+
+
+def model_fingerprint(model_dir):
+    """A model's id (12 hex digits; its version number is tied to it): the one saved in model.id when the folder has
+    one, else the md5 of model.onnx. Raises OSError when the folder has neither."""
+    import hashlib
     d = Path(model_dir)
-    old = d / "model.ncnn.bin"
-    return old if old.exists() else d / MODEL_FILE
+    try:
+        saved = (d / ID_FILE).read_text().strip()
+        if saved:
+            return saved[:12]
+    except OSError:
+        pass
+    p = d / MODEL_FILE
+    st = p.stat()
+    key = (str(p), st.st_size, st.st_mtime_ns)
+    if key not in _fp:
+        h = hashlib.md5()
+        with open(p, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        _fp[key] = h.hexdigest()[:12]
+    return _fp[key]
 
 
 def read_names(model_dir):

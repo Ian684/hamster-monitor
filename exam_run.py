@@ -12,7 +12,7 @@ For every model this counts, with the tracker's own thresholds:
     頭找到率 photos with a head answer where the AI's head box overlaps it (IoU >= 0.3)
 split by brightness (夠亮 / 偏暗 / 太暗) and by area. Writes data/exam/results.json.
 
-usage (on the Pi):  .venv/bin/python exam_run.py models/hamster_ncnn_model [models/hamster_ncnn_model.bak-...]
+usage (on the Pi):  .venv/bin/python exam_run.py models/hamster_model [models/hamster_model.bak-...]
 """
 import json
 import os

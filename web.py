@@ -401,7 +401,7 @@ def ai_status():
     if time.time() - _ai_cache["t"] > 30:
         ds = DATA / "dataset"
         t = current_cfg().get("tracker", {})
-        model = BASE / t.get("yolo_model", "models/hamster_ncnn_model")
+        model = BASE / t.get("yolo_model", "models/hamster_model")
         pack = DATA / "export" / "hamster_dataset.zip"
         _ai_cache["v"] = {
             "detector": t.get("detector", "motion"),
@@ -762,7 +762,6 @@ def _photo_info(p):
 
 
 _scores = {"mt": None, "data": {}}
-_model_id = {"mt": None, "id": None}
 
 
 def _ai_scores():
@@ -798,20 +797,11 @@ def _ai_scores():
 
 
 def _current_model_id():
-    import hashlib
-    from yolo_detector import weights_file
-    p = weights_file(BASE / "models" / "hamster_ncnn_model")
+    from yolo_detector import model_fingerprint
     try:
-        mt = p.stat().st_mtime
+        return model_fingerprint(BASE / "models" / "hamster_model")
     except OSError:
         return None
-    if _model_id["mt"] != mt:
-        h = hashlib.md5()
-        with open(p, "rb") as f:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                h.update(chunk)
-        _model_id.update(mt=mt, id=h.hexdigest()[:12])
-    return _model_id["id"]
 
 
 def _scoring_status(start_if_needed):
@@ -1212,9 +1202,9 @@ def _training_hits(spans):
 def _exam_models():
     import modelnames
     vmap, out = modelnames.versions(MODELS), []
-    for d in MODELS.glob("hamster_ncnn_model*"):
+    for d in MODELS.glob("hamster_model*"):
         if (d / "model.onnx").exists():
-            out.append({"dir": d.name, "label": modelnames.label(d, vmap), "current": d.name == "hamster_ncnn_model",
+            out.append({"dir": d.name, "label": modelnames.label(d, vmap), "current": d.name == "hamster_model",
                         "version": vmap.get(d.name) or 0})
     out.sort(key=lambda m: (not m["current"], -m["version"]))   # in use, then the newest versions first
     return out
@@ -1351,7 +1341,7 @@ def exam_guess():
         return jsonify(ok=False, error="還沒有安裝模型"), 400
     from yolo_detector import YoloOnnx, hamster_and_head
     if _guess["id"] != mid:
-        _guess.update(id=mid, det=YoloOnnx(MODELS / "hamster_ncnn_model", conf=0.2, threads=1))
+        _guess.update(id=mid, det=YoloOnnx(MODELS / "hamster_model", conf=0.2, threads=1))
     img = cv2.imread(str(p))
     b, hd = hamster_and_head(_guess["det"].detect(img)) if img is not None else (None, None)
     c = lambda x: [round(x[0] + x[2] / 2, 4), round(x[1] + x[3] / 2, 4), round(x[2], 4), round(x[3], 4)]   # noqa: E731
@@ -1589,8 +1579,8 @@ def model_upload():
 
 # ---------- model manager: every model on the Pi (the one in use + the older ones kept by install_model.py) ----------
 MODELS = BASE / "models"
-MODEL_CUR = "hamster_ncnn_model"
-MODEL_RE = re.compile(r"^hamster_ncnn_model(\.bak-(\d{8})-(\d{6}))?$")
+MODEL_CUR = "hamster_model"
+MODEL_RE = re.compile(r"^hamster_model(\.bak-(\d{8})-(\d{6}))?$")
 
 
 def _model_dir(name):
@@ -1601,7 +1591,6 @@ def _model_dir(name):
 
 
 def _model_info(d):
-    import hashlib
     meta = (d / "metadata.yaml").read_text(encoding="utf-8", errors="replace") if (d / "metadata.yaml").exists() else ""
     m = re.search(r"(?m)^imgsz:\s*\n\s*-\s*(\d+)", meta)
     trained = None
@@ -1611,14 +1600,11 @@ def _model_info(d):
             trained = datetime.fromisoformat(t.group(1)).astimezone().strftime("%m/%d %H:%M")
         except ValueError:
             pass
-    from yolo_detector import weights_file
-    h = hashlib.md5()
-    with open(weights_file(d), "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
+    from yolo_detector import model_fingerprint
+    mid = model_fingerprint(d)
     bm = MODEL_RE.match(d.name)
     retired = f"{bm.group(2)[4:6]}/{bm.group(2)[6:]} {bm.group(3)[:2]}:{bm.group(3)[2:4]}" if bm.group(1) else None
-    return {"name": d.name, "current": d.name == MODEL_CUR, "id": h.hexdigest()[:12], "imgsz": int(m.group(1)) if m else None,
+    return {"name": d.name, "current": d.name == MODEL_CUR, "id": mid, "imgsz": int(m.group(1)) if m else None,
             "title": _model_title(d),
             "trained": trained, "added": datetime.fromtimestamp(d.stat().st_mtime).strftime("%m/%d %H:%M"), "retired": retired,
             "mb": round(sum(p.stat().st_size for p in d.iterdir() if p.is_file()) / 1e6, 1)}
@@ -1714,7 +1700,7 @@ def models_delete():
 @app.get("/download/model/<name>.zip")
 @require_auth
 def models_download(name):
-    """The model as a zip in the same layout the upload button takes (hamster_ncnn_model/...)."""
+    """The model as a zip in the same layout the upload button takes (hamster_model/...)."""
     import io
     import zipfile
     d = _model_dir(name)
@@ -1724,11 +1710,11 @@ def models_download(name):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(d.iterdir()):
             if p.is_file():
-                z.write(p, f"hamster_ncnn_model/{p.name}")
+                z.write(p, f"hamster_model/{p.name}")
     buf.seek(0)
     info = _model_info(d)
     stamp = (info["trained"] or info["added"]).replace("/", "").replace(":", "").replace(" ", "_")
-    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"hamster_ncnn_model_{stamp}_{info['id'][:6]}.zip")
+    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"hamster_model_{stamp}_{info['id'][:6]}.zip")
 
 
 @app.get("/raw.jpg")
@@ -3018,7 +3004,7 @@ def album_guess():
         return jsonify(ok=False, error="還沒有安裝模型"), 400
     from yolo_detector import YoloOnnx, hamster_and_head
     if _guess["id"] != mid:
-        _guess.update(id=mid, det=YoloOnnx(MODELS / "hamster_ncnn_model", conf=0.2, threads=1))
+        _guess.update(id=mid, det=YoloOnnx(MODELS / "hamster_model", conf=0.2, threads=1))
     img = cv2.imread(str(ALBUM / f"{n}.jpg"))
     b, hd = hamster_and_head(_guess["det"].detect(img)) if img is not None else (None, None)
     c = lambda x: [round(x[0] + x[2] / 2, 4), round(x[1] + x[3] / 2, 4), round(x[2], 4), round(x[3], 4)]   # noqa: E731

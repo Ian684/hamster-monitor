@@ -5,7 +5,7 @@
              (data/trained/: kept so the training set only grows) + the last model's best.pt to fine-tune from
   2 upload   as a private Kaggle dataset  <user>/hamster-train-data   (new version each time)
   3 train    push kaggle_train.py as a private GPU notebook  <user>/hamster-train,  wait until it finishes
-  4 download its output: hamster_ncnn_model.zip + result.json
+  4 download its output: hamster_model.zip + result.json
   5 exam     exam_run.py: the model in use vs the new one, on the owner's exam photos
   6 decide   new one better (找到率 - 誤認率 higher) -> install it (install_model.py; the old one stays in 管理模型)
              not better / too few exam photos -> keep the old one; the new one is kept as an old model to try by hand
@@ -112,7 +112,7 @@ def pack():
             txt = p.with_suffix(".txt")
             (src / txt.name).write_text(txt.read_text() if txt.exists() else "")
             old += 1
-    best = MODELS / "hamster_ncnn_model" / "best.pt"   # fine-tune the model in use when its weights came with it
+    best = MODELS / "hamster_model" / "best.pt"   # fine-tune the model in use when its weights came with it
     if best.exists():
         shutil.copy2(best, src / "best.pt")
     total = len(new) + old
@@ -225,12 +225,12 @@ def main():
     step(4, "下載新模型")
     out = WORK / "out"
     kaggle("kernels", "output", k_id, "-p", str(out), timeout=900)
-    mzip = out / "hamster_ncnn_model.zip"
+    mzip = out / "hamster_model.zip"
     if not mzip.exists():
         raise RuntimeError("Kaggle 沒有產生模型檔")
     res = json.loads((out / "result.json").read_text()) if (out / "result.json").exists() else {}
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    cand = MODELS / f"hamster_ncnn_model.bak-{stamp}"   # until decided it sits with the old models
+    cand = MODELS / f"hamster_model.bak-{stamp}"   # until decided it sits with the old models
     with zipfile.ZipFile(mzip) as z:
         z.extractall(WORK / "cand")
     params = list((WORK / "cand").rglob("model.onnx"))
@@ -245,12 +245,12 @@ def main():
     exam_done = sum(1 for j in EXAM.glob("*.json") if j.name != "results.json" and json.loads(j.read_text()).get("done"))
     verdict, keep_new, cur_s, new_s = None, False, None, None
     if bench and exam_done >= MIN_EXAM:
-        subprocess.run([sys.executable, str(BASE / "exam_run.py"), "models/hamster_ncnn_model", f"models/{cand.name}"],
+        subprocess.run([sys.executable, str(BASE / "exam_run.py"), "models/hamster_model", f"models/{cand.name}"],
                        cwd=BASE, timeout=1800)
         r = json.loads((EXAM / "results.json").read_text())
         by = {m["dir"]: m["overall"] for m in r["models"]}
         score = lambda o: (o.get("found") or 0) - (o.get("false") or 0) + 0.25 * (o.get("head") or 0)   # noqa: E731
-        cur_o, new_o = by.get("hamster_ncnn_model", {}), by.get(cand.name, {})
+        cur_o, new_o = by.get("hamster_model", {}), by.get(cand.name, {})
         cur_s, new_s = round(score(cur_o), 1), round(score(new_o), 1)
         keep_new = new_s > cur_s
         verdict = {"current": cur_o, "new": new_o}

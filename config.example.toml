@@ -69,7 +69,7 @@ dataset_max = 3000               # 訓練照片上限
 positions_keep_days = 30       # 每秒位置紀錄保留幾天 (每分鐘活動量會一直保留)
 # AI 辨識（詳見 YOLO_GUIDE.md）
 detector = "hybrid"      # motion = 動態偵測；hybrid = AI 找位置 + 動態判斷活動（有模型後建議）；yolo = 只用 AI
-yolo_model = "models/hamster_ncnn_model"
+yolo_model = "models/hamster_model"
 yolo_imgsz = 320
 yolo_conf = 0.45         # 信心門檻：誤認太多就調高，常常找不到就調低
 head_conf = 0.25         # 頭的信心門檻（0.35 → 0.25：2026-11-20 實測多找到約 10% 的頭，框錯很少）

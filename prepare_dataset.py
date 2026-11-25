@@ -92,7 +92,7 @@ def main():
             shutil.copy2(txt, work / txt.name)
             prelabeled += 1
     (work / "classes.txt").write_text("hamster\nhead\n")   # class 0 = the whole hamster, class 1 = its head
-    best = BASE / "models" / "hamster_ncnn_model" / "best.pt"   # the Colab notebook continues from the model in use
+    best = BASE / "models" / "hamster_model" / "best.pt"   # the Colab notebook continues from the model in use
     if best.exists():
         shutil.copy2(best, work / "best.pt")
     (work / "README.txt").write_text(

@@ -13,7 +13,7 @@ Layer 3  the whole system on the 跑分影片 (data/bench/clips, owner's timelin
 Accuracy vs darkness: real photos by brightness, plus the same bright photos darkened step by step (synthetic,
 with camera-like noise) to see where it breaks.
 Writes data/bench/results.json; progress in /run/hamster/bench.json.
-usage: .venv/bin/python bench_run.py models/hamster_ncnn_model [models/hamster_ncnn_model.bak-...]
+usage: .venv/bin/python bench_run.py models/hamster_model [models/hamster_model.bak-...]
 """
 import json
 import math

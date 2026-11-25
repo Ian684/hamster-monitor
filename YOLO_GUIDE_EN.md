@@ -35,10 +35,10 @@ Dashboard → AI hamster detection → **打包訓練照片 (Pack training photo
 3. Press ▶ on each cell from top to bottom:
    - Cell 2 shows an upload button → choose your `hamster_dataset.zip`
    - Cell 5 shows the score: **mAP50 of 0.8 or higher works well**; below 0.6 means the labels or photos need improving
-   - Cell 6 downloads **`hamster_ncnn_model.zip`** automatically
+   - Cell 6 downloads **`hamster_model.zip`** automatically
 
 ## 4. Deploy (1 minute)
-Dashboard → AI hamster detection → **上傳訓練好的模型 (Upload trained model)** → choose `hamster_ncnn_model.zip`
+Dashboard → AI hamster detection → **上傳訓練好的模型 (Upload trained model)** → choose `hamster_model.zip`
 - The model is **test-run on the Pi first**; if that fails, nothing is changed
 - On success the old model is backed up, the tracker switches to **hybrid** mode and restarts
 
