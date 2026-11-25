@@ -7,13 +7,13 @@
 | 重點 | 數字 |
 |---|---|
 | 倉鼠身體偵測 F1（人工標註、未用於訓練的跑分照片） | 98.0 % |
-| 通用模型（預訓練 YOLO、YOLO-World、MegaDetector）身體偵測 F1 | 0–17 % |
+| 通用模型（動態偵測、預訓練 YOLO、MegaDetector）身體偵測 F1 | 0–17 % |
 | 樹莓派 5 單次推論時間 | 約 85 ms |
 | 公開資料集 | 3994 張已標註訓練照片、153 段人工標註影片、1623 段錄影 |
 
 ## 功能
 
-- **倉鼠偵測**：YOLO11n 模型（NCNN 格式，在樹莓派 CPU 上執行）偵測倉鼠的身體與頭部。
+- **倉鼠偵測**：YOLO11n 模型（ONNX 格式，以 ONNX Runtime 在樹莓派 CPU 上執行）偵測倉鼠的身體與頭部。
 - **行為判斷**：依照頭的位置和身體動作，判斷喝水、吃東西、跑滾輪。
 - **區域統計**：在網頁上畫出各區域，系統記錄每個區域的進出次數與停留時間。
 - **清籠模式**：偵測到手在短時間內反覆進出籠子時，自動暫停記錄，避免把飼主的動作記成倉鼠的行為；也可以在網頁上手動暫停。
@@ -28,7 +28,7 @@
 
 ```
 相機 (Picamera2) ──> tracker.py ──> SQLite (hamster.db)
-                      │  YOLO11n (NCNN) 找倉鼠與頭
+                      │  YOLO11n (ONNX Runtime) 找倉鼠與頭
                       │  背景相減找動作
                       │  行為與區域判斷、錄影
                       ▼
@@ -54,7 +54,7 @@ heartbeat.py healthchecks.io 心跳
 |---|---|
 | `tracker.py` | 相機追蹤主程式：偵測、行為與區域判斷、錄影、存訓練照片 |
 | `web.py`、`templates/index.html` | 網頁儀表板與 API |
-| `yolo_detector.py` | 在樹莓派 CPU 上執行 NCNN 格式的 YOLO 模型 |
+| `yolo_detector.py` | 以 ONNX Runtime 在樹莓派 CPU 上執行 YOLO 模型 |
 | `autotrain.py`、`kaggle_train.py` | 自動訓練：打包照片、上傳 Kaggle、訓練、下載、考試、安裝 |
 | `bench_run.py` | 跑分：用人工標註、沒用於訓練的照片和影片計算各項指標 |
 | `install_model.py` | 安裝訓練好的模型（舊模型保留在模型管理中） |
@@ -71,7 +71,7 @@ heartbeat.py healthchecks.io 心跳
 cd ~/hamster
 cp config.example.toml config.toml   # 再依自己的籠子修改；手機推播在 [alerts] 填自己的 ntfy topic
 python3 -m venv --system-site-packages .venv   # 需要系統的 picamera2
-.venv/bin/pip install flask opencv-python-headless numpy ncnn kaggle
+.venv/bin/pip install flask opencv-python-headless numpy onnxruntime kaggle
 sudo cp hamster-*.service hamster-*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now hamster-tracker hamster-web hamster-climate hamster-alerts hamster-heartbeat.timer
@@ -181,13 +181,11 @@ AI 每秒分析 1.87 次，單次推論 80 ms（p95 103 ms），相機 14.8 fps�
 | 只用動態偵測 | OpenCV MOG2 背景相減 | 4.8 % | 11.6 % | 4／15／46 | — |
 | 預訓練 YOLO11n（所有類別） | COCO 預訓練，任何物件都當成倉鼠 | 1.0 % | 1.9 % | 1／53／49 | 10 % |
 | 預訓練 YOLO11n（動物類別） | 只算動物類別與玩偶熊 | 3.0 % | 0 % | 0／0／50 | 0 % |
-| YOLO-World v2-S | 開放詞彙，輸入「hamster」 | 0 % | 0 % | 0／0／50 | 0 % |
 | MegaDetector v5a | 野生動物相機偵測模型（281 MB） | 11.6 % | 16.9 % | 6／15／44 | 16 % |
 | **本專案 v28** | YOLO11n 以本籠照片訓練 | **100 %** | **98.0 %** | **48／0／2** | **88 %** |
 
 - **動態偵測**：倉鼠靜止時（吃東西、睡覺、喝水）完全看不到，又常把墊料和光線變化當成倉鼠。
 - **預訓練模型**：COCO 沒有倉鼠類別，俯視、光線偏暗的籠內畫面對通用模型是陌生場景。
-- **YOLO-World**：同一張照片能以 0.77 的信心找到食盆，但輸入「hamster」時一隻都找不到。
 - **MegaDetector**：外部方法中最好，但 50 隻只找到 6 隻；在電腦 CPU 上每張要 3.5 秒，不適合在樹莓派上即時使用。
 - **結論**：通用模型無法直接使用，用本籠照片訓練是準確率提升的關鍵。
 
@@ -303,6 +301,12 @@ AI 每秒分析 1.87 次，單次推論 80 ms（p95 103 ms），相機 14.8 fps�
 3. **頭部誤報**：定期用全部照片一次重新訓練，取代逐版接著訓練；比較實驗中頭部 F1 可從 85.7% 提升到約 90%。
 4. **區域邊界**：改用框的底部（腳的位置）判斷區域，而不是框的中心。
 5. **驗證工具**：做離線重播工具，讓新規則直接在已標註的跑分影片上重跑，每次修改都能立即得到完整分數。
+
+## AI 工具與第三方資源使用揭露
+
+- **生成式 AI**：開發過程使用 Anthropic 的 Claude 協助程式撰寫與除錯、實驗腳本設計、數據整理及文件整理。系統需求與功能規劃、硬體組裝、資料收集與標註、模型訓練決策及結果檢核由團隊完成，文中數據皆為實際量測結果。
+- **預訓練模型與開源套件**：Ultralytics YOLO11（COCO 預訓練權重）、ONNX Runtime、OpenCV、Picamera2、Flask、SQLite；比較實驗另使用 YOLOv8、YOLO12、MegaDetector 與 COCO 預訓練模型。
+- **資料與服務**：訓練與驗證影像皆由本團隊自行拍攝與標註；雲端訓練使用 Kaggle，推播使用 ntfy。
 
 ## 開發團隊
 
