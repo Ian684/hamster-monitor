@@ -404,6 +404,12 @@
   .ed-stage { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
   .ed-stage img { max-width: 100%; max-height: 100%; border-radius: 14px; display: block; user-select: none; -webkit-user-drag: none; }
   .ed-stage canvas { position: absolute; touch-action: none; cursor: crosshair; }
+  /* access mode pill: 可編輯 (owner's devices) / 唯讀 (judges through the public link) */
+  .mode-pill { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 45;
+    padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .02em; pointer-events: none;
+    background: rgba(0,0,0,.45); color: #fff; border: 1px solid rgba(255,255,255,.25); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .mode-pill.ro { background: rgba(190,40,40,.82); border-color: rgba(255,255,255,.4); }
+  .mode-pill[hidden] { display: none; }
   .snack { position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none; z-index: 40;
            background: rgba(30,30,32,.92); padding: 11px 18px; border-radius: 14px; font-size: 14px; transition: all .25s; backdrop-filter: blur(20px); }
   .snack.show { opacity: 1; transform: translate(-50%, 0); }
@@ -1590,6 +1596,7 @@
 </nav>
 
 <div class="snack" id="toast" role="status"></div>
+<div class="mode-pill" id="modePill" hidden></div>
 <div class="editor" id="editor" hidden role="dialog" aria-label="框選籠子範圍">
   <div class="ed-top">
     <b>框選籠子範圍</b>
@@ -6449,6 +6456,26 @@ document.querySelectorAll("[data-phm=body], [data-exm=body]").forEach(b => b.tit
 document.querySelectorAll("[data-phnav='-1'], #exPrev").forEach(b => b.title = "上一張（A）");
 document.querySelectorAll("[data-phnav='1'], #exNext").forEach(b => b.title = "下一張（D）");
 
+
+// access mode: the public (ngrok) link is read-only for judges; the owner's own devices can edit
+(async () => {
+  const pill = $("modePill");
+  try {
+    const j = await (await fetch("/api/access", { cache: "no-store" })).json();
+    pill.textContent = j.readonly ? "唯讀模式：只能瀏覽，不能修改或刪除" : (j.tunnel ? "可編輯模式（外部連線）" : "可編輯模式");
+    pill.classList.toggle("ro", !!j.readonly);
+    pill.hidden = false;
+    if (j.readonly) {
+      document.body.classList.add("readonly");
+      const f0 = window.fetch;   // every change is refused by the server; say why instead of a generic error
+      window.fetch = async (...a) => {
+        const r = await f0(...a);
+        if (r.status === 403 && (a[1]?.method || "GET").toUpperCase() !== "GET") toast("唯讀模式：不能修改或刪除資料");
+        return r;
+      };
+    }
+  } catch (e) { /* offline: leave the pill hidden */ }
+})();
 </script>
 </body>
 </html>

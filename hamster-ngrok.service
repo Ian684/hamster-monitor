@@ -1,0 +1,14 @@
+[Unit]
+Description=Hamster dashboard public link (ngrok). Logins: set_password.py --edit / --judge
+After=network-online.target hamster-web.service
+Wants=network-online.target
+
+[Service]
+User=ian
+# <your-domain>: the free static domain from https://dashboard.ngrok.com/domains ; the web address is [web] host in config.toml
+ExecStart=/usr/local/bin/ngrok http 127.0.0.1:8000 --url=<your-domain>.ngrok-free.dev --log stdout --log-level warn
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

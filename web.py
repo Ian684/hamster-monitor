@@ -128,13 +128,67 @@ def ip_allowed(addr):
     return False
 
 
+TUNNEL_HOSTS = (".ngrok-free.app", ".ngrok-free.dev", ".ngrok.app", ".ngrok.dev", ".ngrok.io", ".ts.net")
+
+
+def via_tunnel():
+    """True when the request came in through a public tunnel (ngrok, Tailscale Funnel).
+    Tunnels add X-Forwarded-For and keep their own host name; a device on the allow-list talking to the Pi directly
+    sends neither. (A device adding the header itself only puts itself behind the tunnel login, so it can't be abused.)"""
+    h = request.headers
+    host = (h.get("X-Forwarded-Host") or h.get("Host") or "").split(":")[0].lower()
+    return bool(h.get("X-Forwarded-For")) or host.endswith(TUNNEL_HOSTS)
+
+
+def tunnel_role():
+    """Who is logged in through the tunnel: "edit" (the owner's tunnel password, [web] tunnel_edit_password_hash),
+    "readonly" (the judges' password, [web] judge_password_hash), or None (no / wrong password).
+    Both are set on the Pi with set_password.py --edit / --judge."""
+    web = current_cfg().get("web", {})
+    auth = request.authorization
+    pw = (auth.password or "") if auth else ""
+    if not pw:
+        return None
+    key = (web.get("tunnel_edit_password_hash", ""), web.get("judge_password_hash", ""), pw)
+    if key not in _role_cache:   # hashing is slow on the Pi and the page asks many times a minute: remember the answer
+        role = None
+        if key[0] and check_password_hash(key[0], pw):
+            role = "edit"
+        elif key[1] and check_password_hash(key[1], pw):
+            role = "readonly"
+        if len(_role_cache) > 64:
+            _role_cache.clear()
+        _role_cache[key] = role
+    return _role_cache[key]
+
+
+_role_cache = {}
+
+
+def access_readonly():
+    return via_tunnel() and tunnel_role() != "edit"
+
+
 def require_auth(fn):
     """Access control.
+    - through a tunnel (ngrok): HTTP basic auth with one of two passwords (any user name):
+      the edit password = everything, the judge password = read-only (anything but GET / HEAD is refused,
+      so nothing can be changed or deleted). No password set = the tunnel is closed.
     - [web] allow_ips set: only those devices get in (no password); everyone else gets 403.
     - otherwise: optional HTTP basic auth (any user name), set with: .venv/bin/python set_password.py
     """
     @wraps(fn)
     def wrapper(*a, **kw):
+        if via_tunnel():
+            web = current_cfg().get("web", {})
+            if not (web.get("judge_password_hash") or web.get("tunnel_edit_password_hash")):
+                return Response("外部連線尚未開放", 403, {"Content-Type": "text/plain; charset=utf-8"})
+            role = tunnel_role()
+            if role is None:
+                return Response("login required", 401, {"WWW-Authenticate": 'Basic realm="hamster"'})
+            if role == "readonly" and request.method not in ("GET", "HEAD", "OPTIONS"):
+                return jsonify(ok=False, readonly=True, error="唯讀模式：不能修改或刪除資料"), 403
+            return fn(*a, **kw)
         allowed = ip_allowed(request.remote_addr or "")
         if allowed is False:
             return Response("這個裝置沒有權限開啟倉鼠小屋", 403, {"Content-Type": "text/plain; charset=utf-8"})
@@ -169,6 +223,13 @@ def since(hours):
 @require_auth
 def index():
     return send_from_directory(BASE / "templates", "index.html")
+
+
+@app.get("/api/access")
+@require_auth
+def access_mode():
+    """Read-only (the judges' login through the tunnel) or editable: shown at the top of the page."""
+    return no_cache(jsonify(readonly=access_readonly(), tunnel=via_tunnel()))
 
 
 def _age(p):
