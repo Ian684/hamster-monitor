@@ -1,0 +1,10 @@
+[Unit]
+Description=Hamster heartbeat ping to healthchecks.io
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ian
+WorkingDirectory=/home/ian/hamster
+ExecStart=/home/ian/hamster/.venv/bin/python /home/ian/hamster/heartbeat.py

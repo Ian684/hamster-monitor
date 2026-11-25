@@ -1,0 +1,15 @@
+
+[alerts]
+# 手機通知 (ntfy)：手機裝 ntfy App，訂閱下面的 topic 就會收到通知。修改後不用重啟，30 秒內生效
+# topic 等於頻道密碼，知道的人都能收到通知，不要公開
+enabled = true
+ntfy_server = "https://ntfy.sh"
+topic = "__TOPIC__"
+check_interval_s = 30
+temp_high = 30.0        # 溫度 >= 這個值持續 hold_minutes 就通知 (降到低 1°C 才算恢復)
+temp_low = 15.0         # 溫度 <= 這個值持續 hold_minutes 就通知
+hum_high = 75           # 濕度 >= 這個值持續 10 分鐘就通知
+hold_minutes = 5        # 狀況要持續多久才通知，避免短暫波動就吵你
+repeat_minutes = 120    # 狀況一直沒改善，每隔多久再提醒一次
+inactive_hours = 18     # 倉鼠超過幾小時沒偵測到活動就通知 (0 = 不檢查)
+daily_summary = "09:00" # 每天這個時間傳昨天的摘要；空字串 "" = 不傳

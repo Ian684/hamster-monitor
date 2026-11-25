@@ -1,0 +1,10 @@
+# 個人設定（含推播 topic、心跳網址、密碼雜湊）：從 config.example.toml 複製
+config.toml
+alerts.toml
+# 執行時產生的資料與模型
+data/
+models/
+.venv/
+__pycache__/
+*.pyc
+*.bak*

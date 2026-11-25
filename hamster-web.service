@@ -1,0 +1,16 @@
+[Unit]
+Description=Hamster dashboard (web UI on port 8000)
+# listens only on the Tailscale address, so start after Tailscale; until the address exists the bind
+# fails and systemd retries every 5 s
+After=network-online.target tailscaled.service
+Wants=tailscaled.service
+
+[Service]
+User=ian
+WorkingDirectory=/home/ian/hamster
+ExecStart=/home/ian/hamster/.venv/bin/python /home/ian/hamster/web.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

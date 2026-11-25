@@ -1,0 +1,13 @@
+[Unit]
+Description=Hamster tracker (camera motion tracking)
+After=multi-user.target
+
+[Service]
+User=ian
+WorkingDirectory=/home/ian/hamster
+ExecStart=/home/ian/hamster/.venv/bin/python /home/ian/hamster/tracker.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

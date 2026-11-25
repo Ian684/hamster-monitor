@@ -1,0 +1,12 @@
+[Unit]
+Description=Hamster camera aiming preview (started from the dashboard, stops after 10 min)
+# the camera can only be used by one program at a time
+Conflicts=hamster-tracker.service
+
+[Service]
+User=ian
+WorkingDirectory=/home/ian/hamster
+ExecStart=/home/ian/hamster/.venv/bin/python /home/ian/hamster/aim.py
+RuntimeMaxSec=660
+# when aiming ends, bring the tracker back if it is meant to run
+ExecStopPost=+/bin/sh -c 'systemctl is-enabled -q hamster-tracker && systemctl start --no-block hamster-tracker || true'

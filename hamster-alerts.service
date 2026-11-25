@@ -1,0 +1,14 @@
+[Unit]
+Description=Hamster phone alerts (ntfy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ian
+WorkingDirectory=/home/ian/hamster
+ExecStart=/home/ian/hamster/.venv/bin/python /home/ian/hamster/alerts.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
