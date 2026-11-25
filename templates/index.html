@@ -2006,7 +2006,7 @@
         <ol><li>跑分 › 資料：準備照片和影片，標好正確答案</li><li>跑分 › 成績：選模型按「開始跑分」</li><li>看精確率、召回率、F1、亮度影響和樹莓派速度</li></ol>
         <button class="btn" data-tour="bench">前往<svg class="chev"><use href="#i-chev"/></svg></button></section>
     </div>
-    <p class="tour-tech">樹莓派 5＋相機・YOLO 倉鼠／頭部辨識（NCNN）・區域停留推估行為・ntfy 推播・Kaggle 自動訓練與跑分</p>
+    <p class="tour-tech">樹莓派 5＋相機・YOLO 倉鼠／頭部辨識（ONNX Runtime）・區域停留推估行為・ntfy 推播・Kaggle 自動訓練與跑分</p>
   </div>
 </div>
 <div class="editor photos" id="album" hidden role="dialog" aria-label="相簿">
@@ -3833,7 +3833,7 @@ function bnRenderRes() {
     `<tr><td>畫面更新 FPS<small>不是 AI 的 FPS</small></td><td>${L.cam_fps != null ? `${L.cam_fps} fps` : "–"}</td></tr>` +
     `<tr><td>CPU 使用量<small>100% = 一核</small></td><td>${L.cpu_pct != null ? `${L.cpu_pct}%` : "–"}</td></tr>` +
     `<tr><td>記憶體</td><td>${L.rss_mb != null ? `${L.rss_mb} MB／${L.mem_total_mb} MB` : "–"}</td></tr>` +
-    `</table></div><div class="note">部署前後差異（best.pt vs NCNN）：Colab 筆記本最後一格</div></div>`;
+    `</table></div><div class="note">部署前後差異（best.pt vs ONNX）：Colab 筆記本最後一格</div></div>`;
   // ---------- 三、整個系統 ----------
   const S = R.system || {};
   h += `<div class="ex-panel"><h3>三、整個系統<small>確認過的影片 ${S.clips || 0} 段・共 ${S.hours != null ? Math.round(S.hours * 600) / 10 : 0} 分鐘</small></h3>`;

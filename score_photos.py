@@ -34,7 +34,8 @@ SURE = 0.45   # same threshold the tracker uses for "this is the hamster"
 
 
 def model_id():
-    p = MODEL / "model.ncnn.bin"
+    from yolo_detector import weights_file
+    p = weights_file(MODEL)
     h = hashlib.md5()
     with open(p, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -68,7 +69,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--all", action="store_true", help="re-score everything")
     a = ap.parse_args()
-    if not (MODEL / "model.ncnn.param").exists():
+    if not (MODEL / "model.onnx").exists():
         print("no model installed"); return
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     lock = open(LOCK, "w")
@@ -79,8 +80,8 @@ def main():
     os.nice(15)   # the tracker comes first
 
     sys.path.insert(0, str(BASE))
-    from yolo_detector import YoloNcnn, hamster_and_head
-    det = YoloNcnn(MODEL, conf=0.05, threads=1)   # low threshold: report even very unsure guesses
+    from yolo_detector import YoloOnnx, hamster_and_head
+    det = YoloOnnx(MODEL, conf=0.05, threads=1)   # low threshold: report even very unsure guesses
     mid = model_id()
     data = {"model": mid, "scores": {}}
     if SCORES.exists() and not a.all:

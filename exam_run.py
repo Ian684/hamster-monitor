@@ -27,7 +27,7 @@ import cv2
 BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE))
 import darkness  # noqa: E402
-from yolo_detector import YoloNcnn, hamster_and_head  # noqa: E402
+from yolo_detector import YoloOnnx, hamster_and_head  # noqa: E402
 
 EXAM = BASE / "data" / "exam"
 PROGRESS = Path("/run/hamster/exam.json")
@@ -103,7 +103,7 @@ def main():
         img = EXAM / (j.stem + ".jpg")
         if a.get("done") and img.exists():
             photos.append((img, a))
-    dirs = [BASE / m for m in sys.argv[1:] if (BASE / m / "model.ncnn.param").exists()]
+    dirs = [BASE / m for m in sys.argv[1:] if (BASE / m / "model.onnx").exists()]
     if not photos or not dirs:
         progress(running=False, error="沒有標好答案的考試照片" if not photos else "找不到模型")
         return
@@ -111,7 +111,7 @@ def main():
     out = {"time": datetime.now().isoformat(timespec="seconds"), "threshold": y_th, "head_threshold": head_th,
            "photos": len(photos), "models": []}
     for d in dirs:
-        det = YoloNcnn(d, conf=0.05, threads=2)
+        det = YoloOnnx(d, conf=0.05, threads=2)
         overall, by_dark, by_zone, per = new_tally(), {}, {}, {}
         for img, a in photos:
             f = cv2.imread(str(img))

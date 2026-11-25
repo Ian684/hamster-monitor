@@ -1,20 +1,35 @@
 #!/usr/bin/env python3
-"""YOLO (Ultralytics YOLO11/YOLOv8 exported to NCNN) object detector for the Raspberry Pi CPU.
+"""YOLO (Ultralytics YOLO11 / YOLOv8 exported to ONNX) object detector for the Raspberry Pi CPU, on ONNX Runtime.
 
 Usage:
-    det = YoloNcnn("models/hamster_ncnn_model", imgsz=320, conf=0.4)
+    det = YoloOnnx("models/hamster_ncnn_model", conf=0.4)
     for x, y, w, h, score, cls in det.detect(bgr_frame):   # boxes normalized 0..1 to the frame
         ...
 
-Export a trained model with:  yolo export model=best.pt format=ncnn imgsz=320
-That produces a folder with model.ncnn.param, model.ncnn.bin and metadata.yaml.
+Export a trained model with:  yolo export model=best.pt format=onnx imgsz=640 simplify=True
+and save it as model.onnx in the model folder (next to best.pt and metadata.yaml).
+(The folder names still say "ncnn": they predate the switch to ONNX Runtime and are kept so nothing else moves.)
 """
+import ast
 import re
 from pathlib import Path
 
 import cv2
-import ncnn
 import numpy as np
+
+MODEL_FILE = "model.onnx"
+
+
+def has_model(model_dir):
+    return (Path(model_dir) / MODEL_FILE).exists()
+
+
+def weights_file(model_dir):
+    """The file a model's fingerprint (id, version number) is taken from. Models from before the switch keep the id
+    of their original weights file, so their version numbers don't change; newer ones use model.onnx."""
+    d = Path(model_dir)
+    old = d / "model.ncnn.bin"
+    return old if old.exists() else d / MODEL_FILE
 
 
 def read_names(model_dir):
@@ -58,36 +73,37 @@ def read_imgsz(model_dir):
     return None
 
 
-class YoloNcnn:
+class YoloOnnx:
     def __init__(self, model_dir, imgsz=320, conf=0.4, iou=0.5, threads=2):
+        import onnxruntime as ort   # imported here: only the processes that run a model need it
         d = Path(model_dir)
-        # An NCNN export only works at the size it was exported with: feeding 320 to a 640 model
-        # crashes the whole process (segfault), so the model's own size always wins.
-        imgsz = read_imgsz(d) or imgsz
-        self.imgsz, self.conf, self.iou = imgsz, conf, iou
-        self.net = ncnn.Net()
-        self.net.opt.use_vulkan_compute = False
-        self.net.opt.num_threads = threads
-        if self.net.load_param(str(d / "model.ncnn.param")) or self.net.load_model(str(d / "model.ncnn.bin")):
-            raise RuntimeError(f"cannot load NCNN model from {d}")
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = threads
+        so.inter_op_num_threads = 1
+        self.sess = ort.InferenceSession(str(d / MODEL_FILE), sess_options=so, providers=["CPUExecutionProvider"])
+        inp = self.sess.get_inputs()[0]
+        self.input_name = inp.name
+        # the export has a fixed input size: the model's own size always wins over the one asked for
+        shape = inp.shape
+        self.imgsz = int(shape[2]) if isinstance(shape[2], int) else (read_imgsz(d) or imgsz)
+        self.conf, self.iou = conf, iou
         self.names = read_names(d)
-        # how many classes the network really outputs (a zip without metadata.yaml was labelled "hamster" only,
-        # 11/15, although the model also finds heads): one blank run tells, and unnamed ones get the usual names
-        try:
-            self.nc = len(self._raw(np.full((self.imgsz, self.imgsz, 3), 114, np.uint8))) - 4
+        try:   # Ultralytics stores the class names in the ONNX file too
+            meta = self.sess.get_modelmeta().custom_metadata_map
+            if meta.get("names"):
+                self.names = {int(k): str(v) for k, v in ast.literal_eval(meta["names"]).items()}
         except Exception:
-            self.nc = len(self.names) or 1
+            pass
+        out = self.sess.get_outputs()[0].shape   # (1, 4 + num_classes, num_anchors)
+        self.nc = int(out[1]) - 4 if isinstance(out[1], int) else (len(self.names) or 1)
         for k, v in {HAMSTER: "hamster", HEAD: "head"}.items():
             if k < self.nc:
                 self.names.setdefault(k, v)
 
     def _raw(self, img):
-        mat = ncnn.Mat.from_pixels(np.ascontiguousarray(img), ncnn.Mat.PixelType.PIXEL_BGR2RGB, self.imgsz, self.imgsz)
-        mat.substract_mean_normalize([], [1 / 255.0] * 3)
-        ex = self.net.create_extractor()
-        ex.input("in0", mat)
-        _, out = ex.extract("out0")
-        pred = np.array(out)                      # (4 + num_classes, num_anchors)
+        x = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        x = np.ascontiguousarray(x.transpose(2, 0, 1)[None])
+        pred = self.sess.run(None, {self.input_name: x})[0]   # (1, 4 + num_classes, num_anchors)
         return pred[0] if pred.ndim == 3 else pred
 
     def _letterbox(self, bgr):
@@ -130,7 +146,7 @@ class YoloNcnn:
 if __name__ == "__main__":   # quick manual test:  python yolo_detector.py MODEL_DIR IMAGE
     import sys
     import time
-    det = YoloNcnn(sys.argv[1], imgsz=int(sys.argv[3]) if len(sys.argv) > 3 else 320, conf=0.25)
+    det = YoloOnnx(sys.argv[1], conf=0.25)
     img = cv2.imread(sys.argv[2])
     det.detect(img)                                   # warm-up
     t = time.perf_counter()

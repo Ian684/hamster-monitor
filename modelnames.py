@@ -16,11 +16,12 @@ _ids = {}   # (path, size, mtime) -> fingerprint, so a 16-37 MB file is read onc
 
 
 def model_dirs(models):
-    return [d for d in Path(models).glob("hamster_ncnn_model*") if d.is_dir() and (d / "model.ncnn.bin").exists()]
+    return [d for d in Path(models).glob("hamster_ncnn_model*") if d.is_dir() and (d / "model.onnx").exists()]
 
 
 def model_id(d):
-    b = Path(d) / "model.ncnn.bin"
+    from yolo_detector import weights_file
+    b = weights_file(d)
     st = b.stat()
     key = (str(b), st.st_size, st.st_mtime_ns)
     if key not in _ids:

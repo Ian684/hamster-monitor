@@ -308,14 +308,14 @@ def load_yolo(t_cfg):
     if mode not in ("yolo", "hybrid"):
         return "motion", None
     model_dir = BASE / t_cfg.get("yolo_model", "models/hamster_ncnn_model")
-    if not (model_dir / "model.ncnn.param").exists():
+    if not (model_dir / "model.onnx").exists():
         log.warning("detector=%s but no model at %s; using motion detection", mode, model_dir)
         return "motion", None
-    from yolo_detector import YoloNcnn   # imported lazily: only needed once a model exists (ncnn)
+    from yolo_detector import YoloOnnx   # imported lazily: only needed once a model exists (ONNX Runtime)
     # ask the model for low-confidence boxes too: they are used to collect "hard" training photos;
     # only boxes >= yolo_conf count as the hamster
     low = min(t_cfg.get("yolo_conf", 0.45), t_cfg.get("hard_conf_low", 0.2))
-    det = YoloNcnn(model_dir, imgsz=t_cfg.get("yolo_imgsz", 320), conf=low)
+    det = YoloOnnx(model_dir, imgsz=t_cfg.get("yolo_imgsz", 320), conf=low)
     log.info("YOLO model loaded from %s (classes: %s)", model_dir, det.names or "?")
     return mode, det
 
@@ -363,8 +363,9 @@ def file_model_id(model_dir):
     """Same id as score_photos.py / web.py: md5 of the weights, 12 hex digits."""
     import hashlib
     h = hashlib.md5()
+    from yolo_detector import weights_file
     try:
-        with open(Path(model_dir) / "model.ncnn.bin", "rb") as f:
+        with open(weights_file(model_dir), "rb") as f:
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 h.update(chunk)
     except OSError:

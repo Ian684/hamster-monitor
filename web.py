@@ -405,7 +405,7 @@ def ai_status():
         pack = DATA / "export" / "hamster_dataset.zip"
         _ai_cache["v"] = {
             "detector": t.get("detector", "motion"),
-            "model_installed": (model / "model.ncnn.param").exists(),
+            "model_installed": (model / "model.onnx").exists(),
             "motion_photos": len(list(ds.glob("motion_*.jpg"))),
             "idle_photos": len(list(ds.glob("idle_*.jpg"))),
             "prelabeled": len(list(ds.glob("motion_*.txt"))),
@@ -799,7 +799,8 @@ def _ai_scores():
 
 def _current_model_id():
     import hashlib
-    p = BASE / "models" / "hamster_ncnn_model" / "model.ncnn.bin"
+    from yolo_detector import weights_file
+    p = weights_file(BASE / "models" / "hamster_ncnn_model")
     try:
         mt = p.stat().st_mtime
     except OSError:
@@ -1212,7 +1213,7 @@ def _exam_models():
     import modelnames
     vmap, out = modelnames.versions(MODELS), []
     for d in MODELS.glob("hamster_ncnn_model*"):
-        if (d / "model.ncnn.param").exists():
+        if (d / "model.onnx").exists():
             out.append({"dir": d.name, "label": modelnames.label(d, vmap), "current": d.name == "hamster_ncnn_model",
                         "version": vmap.get(d.name) or 0})
     out.sort(key=lambda m: (not m["current"], -m["version"]))   # in use, then the newest versions first
@@ -1348,9 +1349,9 @@ def exam_guess():
     mid = _current_model_id()
     if not mid:
         return jsonify(ok=False, error="還沒有安裝模型"), 400
-    from yolo_detector import YoloNcnn, hamster_and_head
+    from yolo_detector import YoloOnnx, hamster_and_head
     if _guess["id"] != mid:
-        _guess.update(id=mid, det=YoloNcnn(MODELS / "hamster_ncnn_model", conf=0.2, threads=1))
+        _guess.update(id=mid, det=YoloOnnx(MODELS / "hamster_ncnn_model", conf=0.2, threads=1))
     img = cv2.imread(str(p))
     b, hd = hamster_and_head(_guess["det"].detect(img)) if img is not None else (None, None)
     c = lambda x: [round(x[0] + x[2] / 2, 4), round(x[1] + x[3] / 2, 4), round(x[2], 4), round(x[3], 4)]   # noqa: E731
@@ -1571,7 +1572,7 @@ def clips_delete():
 def model_upload():
     f = request.files.get("model")
     if not f or not f.filename.lower().endswith(".zip"):
-        return jsonify(ok=False, error="請選擇 Colab 下載的 hamster_ncnn_model.zip"), 400
+        return jsonify(ok=False, error="請選擇訓練產生的模型 zip（內含 model.onnx）"), 400
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "model.zip"
         f.save(path)
@@ -1596,7 +1597,7 @@ def _model_dir(name):
     if not MODEL_RE.match(name or ""):
         return None
     d = MODELS / name
-    return d if (d / "model.ncnn.param").exists() and (d / "model.ncnn.bin").exists() else None
+    return d if (d / "model.onnx").exists() else None
 
 
 def _model_info(d):
@@ -1610,8 +1611,9 @@ def _model_info(d):
             trained = datetime.fromisoformat(t.group(1)).astimezone().strftime("%m/%d %H:%M")
         except ValueError:
             pass
+    from yolo_detector import weights_file
     h = hashlib.md5()
-    with open(d / "model.ncnn.bin", "rb") as f:
+    with open(weights_file(d), "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     bm = MODEL_RE.match(d.name)
@@ -3014,9 +3016,9 @@ def album_guess():
     mid = _current_model_id()
     if not mid:
         return jsonify(ok=False, error="還沒有安裝模型"), 400
-    from yolo_detector import YoloNcnn, hamster_and_head
+    from yolo_detector import YoloOnnx, hamster_and_head
     if _guess["id"] != mid:
-        _guess.update(id=mid, det=YoloNcnn(MODELS / "hamster_ncnn_model", conf=0.2, threads=1))
+        _guess.update(id=mid, det=YoloOnnx(MODELS / "hamster_ncnn_model", conf=0.2, threads=1))
     img = cv2.imread(str(ALBUM / f"{n}.jpg"))
     b, hd = hamster_and_head(_guess["det"].detect(img)) if img is not None else (None, None)
     c = lambda x: [round(x[0] + x[2] / 2, 4), round(x[1] + x[3] / 2, 4), round(x[2], 4), round(x[3], 4)]   # noqa: E731

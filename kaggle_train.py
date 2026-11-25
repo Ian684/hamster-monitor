@@ -1,5 +1,5 @@
 # Runs ON KAGGLE (free GPU), pushed there by autotrain.py. Same training as train_hamster_colab.ipynb:
-# photos + YOLO .txt labels (0 = hamster, 1 = head; no / empty .txt = no hamster) -> YOLO11n at 320 px -> NCNN.
+# photos + YOLO .txt labels (0 = hamster, 1 = head; no / empty .txt = no hamster) -> YOLO11n -> ONNX (run on the Pi with ONNX Runtime).
 # Output in /kaggle/working: hamster_ncnn_model.zip (what the Pi installs) and result.json (scores).
 import hashlib
 import json
@@ -79,9 +79,17 @@ base.train(data=str(ds / "data.yaml"), imgsz=imgsz, batch=32, project=str(TMP / 
            fliplr=0.5, flipud=0.5, degrees=10, mosaic=1.0, **tune)
 best = YOLO(str(TMP / "runs/hamster/weights/best.pt"))
 m = best.val(data=str(ds / "data.yaml"), imgsz=imgsz)
-out = pathlib.Path(best.export(format="ncnn", imgsz=imgsz))
-pkg = TMP / "hamster_ncnn_model"
-shutil.copytree(out, pkg)
+DEPLOY_IMGSZ = 480   # what the Pi runs: on ONNX Runtime 480 was as accurate as 640 on the 跑分 photos in about half the time
+out = pathlib.Path(best.export(format="onnx", imgsz=DEPLOY_IMGSZ, simplify=True))   # runs on the Pi with ONNX Runtime
+pkg = TMP / "hamster_ncnn_model"   # folder name kept from the NCNN days: the Pi's model folders all use it
+pkg.mkdir(parents=True, exist_ok=True)
+shutil.copy(out, pkg / "model.onnx")
+import datetime as _dt   # metadata.yaml: the input size, class names and training date the Pi reads
+(pkg / "metadata.yaml").write_text("".join([
+    f"description: Ultralytics YOLO11n model trained on {ds / 'data.yaml'}\n",
+    f"date: \"{_dt.datetime.now(_dt.timezone.utc).isoformat()}\"\n",
+    f"task: detect\nimgsz:\n- {imgsz}\n- {imgsz}\nnames:\n",
+    *(f"  {k}: {v}\n" for k, v in sorted(best.names.items()))]), encoding="utf-8")
 shutil.copy(TMP / "runs/hamster/weights/best.pt", pkg / "best.pt")   # the next training starts from this
 shutil.make_archive(str(OUT / "hamster_ncnn_model"), "zip", str(TMP), "hamster_ncnn_model")
 (OUT / "result.json").write_text(json.dumps({

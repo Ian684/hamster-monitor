@@ -32,7 +32,7 @@ import numpy as np
 BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE))
 import darkness  # noqa: E402
-from yolo_detector import YoloNcnn  # noqa: E402
+from yolo_detector import YoloOnnx  # noqa: E402
 
 DATA = BASE / "data"
 EXAM, BENCH = DATA / "exam", DATA / "bench"
@@ -461,7 +461,7 @@ def wheel_replay(name, cfg):
 
 def main():
     cfg = tomllib.load(open(BASE / "config.toml", "rb")).get("tracker", {})
-    dirs = [BASE / m for m in sys.argv[1:] if (BASE / m / "model.ncnn.param").exists()]
+    dirs = [BASE / m for m in sys.argv[1:] if (BASE / m / "model.onnx").exists()]
     items = photos()
     out = {"time": datetime.now().isoformat(timespec="seconds"), "photos": len(items), "models": []}
     db = sqlite3.connect(DATA / "hamster.db")
@@ -470,13 +470,13 @@ def main():
     out["live"] = layer2_live()   # before the benchmark loads the CPU itself
     done = [0]
     for k, d in enumerate(dirs):
-        det = YoloNcnn(d, conf=0.01, threads=2)
+        det = YoloOnnx(d, conf=0.01, threads=2)
 
         def step(i, n, k=k):
             progress(running=True, text=f"第 {k + 1}/{len(dirs)} 個模型：照片 {i}/{n}", done=done[0] + i, total=total)
         r = layer1(det, items, cfg, db, synth=(k == 0), step=step) if items else {}
         done[0] += len(items)
-        size = sum(p.stat().st_size for p in d.glob("model.ncnn.*"))
+        size = sum(p.stat().st_size for p in d.glob("model.onnx"))
         out["models"].append({"dir": d.name, "label": model_label(d), "size_mb": round(size / 1e6, 1),
                               "imgsz": det.imgsz, "nc": det.nc, **r})
     progress(running=True, text="影片：行為、停留與滾輪", done=total, total=total)

@@ -233,9 +233,9 @@ def main():
     cand = MODELS / f"hamster_ncnn_model.bak-{stamp}"   # until decided it sits with the old models
     with zipfile.ZipFile(mzip) as z:
         z.extractall(WORK / "cand")
-    params = list((WORK / "cand").rglob("model.ncnn.param"))
+    params = list((WORK / "cand").rglob("model.onnx"))
     if not params:
-        raise RuntimeError("下載的模型裡沒有 model.ncnn.param")
+        raise RuntimeError("下載的模型裡沒有 model.onnx")
     shutil.copytree(params[0].parent, cand)
     (cand / "autotrain.json").write_text(json.dumps({"trained": stamp, **res}, ensure_ascii=False))
 

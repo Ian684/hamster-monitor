@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install a trained NCNN model zip (from the Colab notebook) and switch the tracker to AI detection.
+"""Install a trained ONNX model zip (from the Colab notebook) and switch the tracker to AI detection.
 
 Usage on the Pi:  cd ~/hamster && .venv/bin/python install_model.py hamster_ncnn_model.zip [--mode hybrid|yolo]
 Steps: unzip -> check it loads and runs -> back up the old model -> move into place ->
@@ -27,14 +27,13 @@ def fail(msg):
     sys.exit(1)
 
 
-# Runs the model once in a separate process: a model run at the wrong input size can crash NCNN outright
-# (segfault), which must not take this installer down with it.
+# Runs the model once in a separate process, so a broken model file can't take this installer down with it.
 PROBE = r"""
 import sys, time, json
 sys.path.insert(0, sys.argv[3])
 import cv2, numpy as np
-from yolo_detector import YoloNcnn
-det = YoloNcnn(sys.argv[1], imgsz=int(sys.argv[2]), conf=0.25)
+from yolo_detector import YoloOnnx
+det = YoloOnnx(sys.argv[1], imgsz=int(sys.argv[2]), conf=0.25)
 img = cv2.imread(sys.argv[3] + "/data/latest.jpg")
 if img is None:
     img = np.zeros((480, 640, 3), np.uint8)
@@ -71,7 +70,7 @@ def read_imgsz_safe(d):
 
 def same_files(a, b):
     return all((a / n).exists() and (b / n).exists() and (a / n).read_bytes() == (b / n).read_bytes()
-               for n in ("model.ncnn.param", "model.ncnn.bin"))
+               for n in ("model.onnx",))
 
 
 def main():
@@ -96,12 +95,12 @@ def install(a, tmp):
             z.extractall(tmp)
     except zipfile.BadZipFile:
         fail("不是有效的 zip 檔")
-    params = list(tmp.rglob("model.ncnn.param"))
-    if len(params) != 1 or not (params[0].parent / "model.ncnn.bin").exists():
-        fail("zip 裡找不到 model.ncnn.param / model.ncnn.bin（請用 Colab 筆記本最後一格產生的 zip）")
+    params = list(tmp.rglob("model.onnx"))
+    if len(params) != 1:
+        fail("zip 裡找不到 model.onnx（請用自動訓練或 Colab 筆記本產生的 zip）")
     src = params[0].parent
     # the training weights (best.pt) let the next training continue from this model: keep them wherever they
-    # are in the zip (next to the NCNN files, one folder up, ...)
+    # are in the zip (next to model.onnx, one folder up, ...)
     pts = sorted(tmp.rglob("*.pt"), key=lambda q: (q.name != "best.pt", len(q.parts)))
     if pts and not (src / "best.pt").exists():
         shutil.copy2(pts[0], src / "best.pt")
